@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /404.html
+
+Sitemap: https://riyasva.com/sitemap.xml
+
+# Guidance for AI crawlers
+# https://riyasva.com/llms.txt

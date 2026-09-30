@@ -1,256 +1,139 @@
-const header = document.querySelector(".site-header");
-const menu = document.querySelector(".menu-toggle");
-const nav = document.querySelector(".nav-links");
+/* Riyas V. A. | site behaviour
+   Progressive enhancement only: the page is fully usable without this file. */
+(function () {
+  "use strict";
 
-window.addEventListener("scroll", () => {
-  header.classList.toggle("scrolled", window.scrollY > 24);
-});
+  const doc = document;
+  const root = doc.documentElement;
+  root.classList.remove("no-js");
 
-menu.addEventListener("click", () => {
-  const open = nav.classList.toggle("open");
-  menu.setAttribute("aria-expanded", open);
-});
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const header = doc.querySelector(".masthead");
 
-document.querySelectorAll(".nav-links a").forEach(link => {
-  link.addEventListener("click", () => {
-    nav.classList.remove("open");
-    menu.setAttribute("aria-expanded", "false");
+  /* ---------- Mobile navigation ---------- */
+  const toggle = doc.querySelector(".menu-toggle");
+  const nav = doc.querySelector("#primary-nav");
+  if (header) header.classList.add("has-js");
+
+  function setMenu(open) {
+    if (!toggle || !nav) return;
+    nav.classList.toggle("open", open);
+    toggle.setAttribute("aria-expanded", String(open));
+    toggle.setAttribute("aria-label", open ? "Close menu" : "Open menu");
+  }
+
+  if (toggle && nav) {
+    toggle.addEventListener("click", () => setMenu(!nav.classList.contains("open")));
+    nav.addEventListener("click", (e) => {
+      if (e.target.closest("a")) setMenu(false);
+    });
+    doc.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && nav.classList.contains("open")) {
+        setMenu(false);
+        toggle.focus();
+      }
+    });
+    doc.addEventListener("click", (e) => {
+      if (nav.classList.contains("open") && !nav.contains(e.target) && !toggle.contains(e.target)) setMenu(false);
+    });
+  }
+
+  /* ---------- Current-section highlight in nav ---------- */
+  const navLinks = Array.from(doc.querySelectorAll("#primary-nav a[href^='#']"));
+  const sections = navLinks.map((a) => doc.querySelector(a.getAttribute("href"))).filter(Boolean);
+  if ("IntersectionObserver" in window && sections.length) {
+    const spy = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          navLinks.forEach((a) => {
+            const active = a.getAttribute("href") === "#" + entry.target.id;
+            if (active) a.setAttribute("aria-current", "true");
+            else a.removeAttribute("aria-current");
+          });
+        });
+      },
+      { rootMargin: "-40% 0px -55% 0px" }
+    );
+    sections.forEach((s) => spy.observe(s));
+  }
+
+  /* ---------- Footer year ---------- */
+  doc.querySelectorAll("[data-year]").forEach((el) => {
+    el.textContent = String(new Date().getFullYear());
   });
-});
 
-const observer = new IntersectionObserver(entries => {
-  entries.forEach(entry => {
-    if (entry.isIntersecting) {
-      entry.target.classList.add("visible");
-      observer.unobserve(entry.target);
+  /* ---------- Carousels (scroll-snap + buttons + status) ---------- */
+  doc.querySelectorAll("[data-carousel]").forEach((carousel) => {
+    const track = carousel.querySelector("[data-carousel-track]");
+    const prev = carousel.querySelector("[data-carousel-prev]");
+    const next = carousel.querySelector("[data-carousel-next]");
+    const status = carousel.querySelector("[data-carousel-status]");
+    if (!track || !prev || !next) return;
+
+    const items = Array.from(track.children);
+    const pad = (n) => String(n).padStart(2, "0");
+
+    function stepWidth() {
+      const first = items[0];
+      if (!first) return 0;
+      const gap = parseFloat(getComputedStyle(track).columnGap || getComputedStyle(track).gap) || 0;
+      return first.getBoundingClientRect().width + gap;
     }
-  });
-}, {
-  threshold: 0.12
-});
 
-document.querySelectorAll(".reveal").forEach(element => {
-  observer.observe(element);
-});
-
-document.getElementById("year").textContent = new Date().getFullYear();
-
-
-/* Awards carousel — 3 desktop / 2 tablet / 1 mobile */
-document.querySelectorAll("[data-awards-carousel]").forEach(carousel => {
-  const viewport = carousel.querySelector(".awards-viewport");
-  const track = carousel.querySelector(".awards-track");
-  const slides = Array.from(carousel.querySelectorAll(".award-slide"));
-  const prev = carousel.querySelector(".award-nav-prev");
-  const next = carousel.querySelector(".award-nav-next");
-  const dotsWrap = carousel.querySelector(".award-dots");
-  const counter = carousel.querySelector(".award-counter b");
-
-  let current = 0;
-  let timer = null;
-  let perView = getPerView();
-
-  function getPerView() {
-    if (window.innerWidth <= 640) return 1;
-    if (window.innerWidth <= 980) return 2;
-    return 3;
-  }
-
-  function maxIndex() {
-    return Math.max(0, slides.length - perView);
-  }
-
-  function rebuildDots() {
-    dotsWrap.innerHTML = "";
-    const totalPositions = maxIndex() + 1;
-
-    for (let i = 0; i < totalPositions; i++) {
-      const dot = document.createElement("button");
-      dot.type = "button";
-      dot.className = "award-dot" + (i === current ? " active" : "");
-      dot.setAttribute("aria-label", `Go to award group ${i + 1}`);
-      dot.addEventListener("click", () => goTo(i, true));
-      dotsWrap.appendChild(dot);
+    function currentIndex() {
+      const w = stepWidth();
+      return w ? Math.round(track.scrollLeft / w) : 0;
     }
-  }
 
-  function getStep() {
-    if (!slides.length) return 0;
-    const first = slides[0];
-    const slideWidth = first.getBoundingClientRect().width;
-    const gap = parseFloat(getComputedStyle(track).gap) || 0;
-    return slideWidth + gap;
-  }
+    function update() {
+      const max = track.scrollWidth - track.clientWidth - 2;
+      prev.disabled = track.scrollLeft <= 2;
+      next.disabled = track.scrollLeft >= max;
+      if (status) status.textContent = pad(currentIndex() + 1) + " / " + pad(items.length);
+    }
 
-  function goTo(index, resetAuto = false) {
-    const max = maxIndex();
+    function scrollBy(dir) {
+      track.scrollBy({ left: dir * stepWidth(), behavior: reduceMotion ? "auto" : "smooth" });
+    }
 
-    if (index > max) index = 0;
-    if (index < 0) index = max;
+    prev.addEventListener("click", () => scrollBy(-1));
+    next.addEventListener("click", () => scrollBy(1));
 
-    current = index;
-
-    const offset = getStep() * current;
-    track.style.transform = `translateX(-${offset}px)`;
-
-    const dots = Array.from(dotsWrap.querySelectorAll(".award-dot"));
-    dots.forEach((dot, i) => {
-      dot.classList.toggle("active", i === current);
+    // Arrow keys when the track (or something inside it) has focus
+    track.setAttribute("tabindex", "0");
+    track.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowRight") { e.preventDefault(); scrollBy(1); }
+      if (e.key === "ArrowLeft") { e.preventDefault(); scrollBy(-1); }
+      if (e.key === "Home") { e.preventDefault(); track.scrollTo({ left: 0 }); }
+      if (e.key === "End") { e.preventDefault(); track.scrollTo({ left: track.scrollWidth }); }
     });
 
-    if (counter) {
-      counter.textContent = String(current + 1).padStart(2, "0");
-    }
+    let raf = 0;
+    track.addEventListener("scroll", () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(update);
+    }, { passive: true });
+    window.addEventListener("resize", update, { passive: true });
+    update();
+  });
 
-    if (resetAuto) restartAuto();
-  }
-
-  function restartAuto() {
-    clearInterval(timer);
-    timer = setInterval(() => {
-      goTo(current + 1);
-    }, 4200);
-  }
-
-  function refreshLayout() {
-    const newPerView = getPerView();
-
-    if (newPerView !== perView) {
-      perView = newPerView;
-      current = Math.min(current, maxIndex());
-      rebuildDots();
-    }
-
-    goTo(current);
-  }
-
-  prev.addEventListener("click", () => goTo(current - 1, true));
-  next.addEventListener("click", () => goTo(current + 1, true));
-
-  carousel.addEventListener("mouseenter", () => clearInterval(timer));
-  carousel.addEventListener("mouseleave", restartAuto);
-
-  let touchStartX = 0;
-
-  carousel.addEventListener("touchstart", event => {
-    touchStartX = event.touches[0].clientX;
-  }, { passive: true });
-
-  carousel.addEventListener("touchend", event => {
-    const diff = event.changedTouches[0].clientX - touchStartX;
-
-    if (Math.abs(diff) > 45) {
-      goTo(current + (diff < 0 ? 1 : -1), true);
-    }
-  }, { passive: true });
-
-  window.addEventListener("resize", refreshLayout);
-
-  rebuildDots();
-  goTo(0);
-  restartAuto();
-});
-
-
-/* Media carousel — 3 desktop / 2 tablet / 1 mobile */
-document.querySelectorAll("[data-media-carousel]").forEach(carousel => {
-  const track = carousel.querySelector(".media-track");
-  const slides = Array.from(carousel.querySelectorAll(".media-slide"));
-  const prev = carousel.querySelector(".media-nav-prev");
-  const next = carousel.querySelector(".media-nav-next");
-  const dotsWrap = carousel.querySelector(".media-dots");
-
-  let current = 0;
-  let perView = getPerView();
-  let timer = null;
-
-  function getPerView() {
-    if (window.innerWidth <= 640) return 1;
-    if (window.innerWidth <= 980) return 2;
-    return 3;
-  }
-
-  function maxIndex() {
-    return Math.max(0, slides.length - perView);
-  }
-
-  function getStep() {
-    if (!slides.length) return 0;
-    const width = slides[0].getBoundingClientRect().width;
-    const gap = parseFloat(getComputedStyle(track).gap) || 0;
-    return width + gap;
-  }
-
-  function rebuildDots() {
-    dotsWrap.innerHTML = "";
-
-    for (let i = 0; i <= maxIndex(); i++) {
-      const dot = document.createElement("button");
-      dot.type = "button";
-      dot.className = "media-dot" + (i === current ? " active" : "");
-      dot.setAttribute("aria-label", `Go to media group ${i + 1}`);
-      dot.addEventListener("click", () => goTo(i, true));
-      dotsWrap.appendChild(dot);
-    }
-  }
-
-  function goTo(index, resetAuto = false) {
-    const max = maxIndex();
-
-    if (index > max) index = 0;
-    if (index < 0) index = max;
-
-    current = index;
-
-    track.style.transform = `translateX(-${getStep() * current}px)`;
-
-    Array.from(dotsWrap.querySelectorAll(".media-dot")).forEach((dot, i) => {
-      dot.classList.toggle("active", i === current);
+  /* ---------- Consent-gated media embeds ---------- */
+  doc.querySelectorAll("[data-embed]").forEach((frame) => {
+    const btn = frame.querySelector(".media-play");
+    if (!btn) return;
+    btn.addEventListener("click", () => {
+      if (frame.classList.contains("is-loaded")) return;
+      const iframe = doc.createElement("iframe");
+      iframe.src = frame.dataset.src;
+      iframe.title = frame.dataset.title || "Embedded video";
+      iframe.loading = "lazy";
+      iframe.referrerPolicy = "strict-origin-when-cross-origin";
+      iframe.setAttribute("allow", "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share");
+      iframe.setAttribute("allowfullscreen", "");
+      frame.appendChild(iframe);
+      frame.classList.add("is-loaded");
+      iframe.focus();
     });
-
-    if (resetAuto) restartAuto();
-  }
-
-  function restartAuto() {
-    clearInterval(timer);
-    timer = setInterval(() => goTo(current + 1), 4500);
-  }
-
-  function refresh() {
-    const newPerView = getPerView();
-
-    if (newPerView !== perView) {
-      perView = newPerView;
-      current = Math.min(current, maxIndex());
-      rebuildDots();
-    }
-
-    goTo(current);
-  }
-
-  prev.addEventListener("click", () => goTo(current - 1, true));
-  next.addEventListener("click", () => goTo(current + 1, true));
-
-  carousel.addEventListener("mouseenter", () => clearInterval(timer));
-  carousel.addEventListener("mouseleave", restartAuto);
-
-  let touchStartX = 0;
-
-  carousel.addEventListener("touchstart", event => {
-    touchStartX = event.touches[0].clientX;
-  }, { passive: true });
-
-  carousel.addEventListener("touchend", event => {
-    const diff = event.changedTouches[0].clientX - touchStartX;
-
-    if (Math.abs(diff) > 45) {
-      goTo(current + (diff < 0 ? 1 : -1), true);
-    }
-  }, { passive: true });
-
-  window.addEventListener("resize", refresh);
-
-  rebuildDots();
-  goTo(0);
-  restartAuto();
-});
+  });
+})();

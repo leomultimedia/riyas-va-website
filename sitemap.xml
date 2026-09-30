@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <url>
+    <loc>https://riyasva.com/</loc>
+    <lastmod>2026-09-30</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>1.0</priority>
+    <image:image>
+      <image:loc>https://riyasva.com/assets/img/riyas-va-800.webp</image:loc>
+      <image:title>Riyas V. A., Chairman &amp; Managing Director, Atlas–Maharani Group</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://riyasva.com/assets/og/riyas-va-og.jpg</image:loc>
+      <image:title>Riyas V. A., official website</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://riyasva.com/press</loc>
+    <lastmod>2026-09-30</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <image:image>
+      <image:loc>https://riyasva.com/assets/press/riyas-va-portrait.jpg</image:loc>
+      <image:title>Official portrait of Riyas V. A.</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://riyasva.com/privacy</loc>
+    <lastmod>2026-09-30</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.2</priority>
+  </url>
+</urlset>
